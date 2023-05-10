@@ -10,6 +10,42 @@
 
 static struct nf_hook_ops hook1, hook2;
 
+void pkt_hex_dump(struct sk_buff *skb)
+{
+    size_t len;
+    int rowsize = 16;
+    int i, l, linelen, remaining;
+    int li = 0;
+    uint8_t *data, ch; 
+
+    printk("Packet hex dump:\n");
+    data = (uint8_t *) skb_mac_header(skb);
+
+    if (skb_is_nonlinear(skb)) {
+        len = skb->data_len;
+    } else {
+        len = skb->len;
+    }
+
+    remaining = len;
+    for (i = 0; i < len; i += rowsize) {
+        printk("%06d\t", li);
+
+        linelen = min(remaining, rowsize);
+        remaining -= rowsize;
+
+        for (l = 0; l < linelen; l++) {
+            ch = data[l];
+            printk(KERN_CONT "%02X ", (uint32_t) ch);
+        }
+
+        data += linelen;
+        li += 10; 
+
+        printk(KERN_CONT "\n");
+    }
+}
+
 unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_state *state){
 	struct iphdr *iph;
 	struct tcphdr *tcph;
@@ -22,11 +58,14 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
 
 	iph = ip_hdr(skb);
 	tcph = tcp_hdr(skb);
+	int tcp_len = ntohs(iph->tot_len);
 	user_data = (unsigned char *)((unsigned char *)tcph + (tcph->doff * 4));
 
 	printk("\t %pI4:%d --> %pI4:%hu\n", &(iph->saddr), ntohs(tcph->source), &(iph->daddr), ntohs(tcph->dest));
 	printk("\t Seq: %d", ntohl(tcph->seq));
-	printk("\t Data: %x%x%x%x", user_data[0], user_data[1], user_data[2], user_data[3]);
+	printk("\t Size: %d", tcp_len);
+	pkt_hex_dump(skb);
+	printk("\t Data: %s", user_data);
 
 	struct ethhdr *ether = eth_hdr(skb);
 
