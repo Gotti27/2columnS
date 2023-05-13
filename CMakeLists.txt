@@ -3,4 +3,4 @@ project(2columnS C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(2columnS main.c)
+add_executable(2columnS firewall.c)
