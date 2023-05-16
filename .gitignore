@@ -184,3 +184,4 @@ fabric.properties
 .nfs*
 
 # End of https://www.toptal.com/developers/gitignore/api/linux,c,clion
+comm_test/netlink_user
