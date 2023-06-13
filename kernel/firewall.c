@@ -73,7 +73,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     struct ethhdr *ether;
     unsigned char* user_data;
     char addr_str[16] = "127.0.0.1";
-    char msg[50];
+    //char msg[50];
 
     u32 ipaddr;
 
@@ -117,27 +117,40 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     // pkt_hex_dump(skb);
 
     //invio dato ricevuto a user space
-    //inizializzo stringa buffer, 
-    memset(msg,0,strlen(msg));
-    sprintf(msg, "Ricevuto pacchetto da: %pI4", &(iph->saddr));
-
-    msg_size = strlen(msg);
     
-    skb_out = nlmsg_new(msg_size, 0);
-    if (!skb_out) {
-        printk(KERN_ERR "Failed to allocate new skb\n");
-        return NF_ACCEPT;
-    }
-
-    //invio messaggio in broadcast
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
-    //NETLINK_CB(skb_out).dst_group = 1;
-    strncpy(nlmsg_data(nlh), msg, msg_size);
-
-    res = nlmsg_multicast(nl_sk, skb_out, 0, 27, GFP_KERNEL);
-    if (res < 0)
+    if(pid != -1)
     {
-        printk(KERN_INFO "Error while sending back to user\n");
+        char str[20];
+        memset(str,0,strlen(str));
+
+        sprintf(str, "%pI4", &(iph->saddr));
+
+        char msg[50] = "Ricevuto pacchetto da ";
+
+        strcat(msg, str);
+
+        msg_size = strlen(msg);
+        
+        skb_out = nlmsg_new(msg_size, 0);
+        if (!skb_out) {
+            printk(KERN_ERR "Failed to allocate new skb\n");
+            return NF_ACCEPT;
+        }
+
+        nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+        NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
+        strncpy(nlmsg_data(nlh), msg, msg_size);
+
+        res = nlmsg_unicast(nl_sk, skb_out, pid);
+        if (res < 0)
+        {
+            printk(KERN_INFO "Error while sending bak to user\n");
+            pid = -1;
+        }
+    }
+    else
+    {
+        printk(KERN_INFO "Error, pid not configured\n");
     }
 
     return NF_ACCEPT;
