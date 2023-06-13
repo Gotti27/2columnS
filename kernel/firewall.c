@@ -8,7 +8,7 @@
 #include <linux/icmp.h>
 #include <linux/skbuff.h>
 #include <linux/inet.h>
-#include <net/sock.h>
+//#include <net/sock.h>
 #include <linux/netlink.h>
 #define NETLINK_USER 31
 
@@ -66,13 +66,15 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     struct sk_buff *skb_out;
     int msg_size;
     int res;
-
+    int tcp_len;
     struct iphdr *iph;
     struct tcphdr *tcph;
     struct udphdr *udph;
     struct ethhdr *ether;
     unsigned char* user_data;
     char addr_str[16] = "127.0.0.1";
+    char msg[50];
+
     u32 ipaddr;
 
     in4_pton(addr_str, -1, (u8*)&ipaddr, '\0', NULL);
@@ -81,7 +83,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     iph = ip_hdr(skb);
     tcph = tcp_hdr(skb);
     ether = eth_hdr(skb);
-    int tcp_len = ntohs(iph->tot_len);
+    tcp_len = ntohs(iph->tot_len);
     user_data = (unsigned char *)((unsigned char *)tcph + (tcph->doff * 4));
 
     /*
@@ -115,40 +117,27 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     // pkt_hex_dump(skb);
 
     //invio dato ricevuto a user space
+    //inizializzo stringa buffer, 
+    memset(msg,0,strlen(msg));
+    sprintf(msg, "Ricevuto pacchetto da: %pI4", &(iph->saddr));
+
+    msg_size = strlen(msg);
     
-    if(pid != -1)
-    {
-        char str[20];
-        memset(str,0,strlen(str));
-
-        sprintf(str, "%pI4", &(iph->saddr));
-
-        char msg[50] = "Ricevuto pacchetto da ";
-
-        strcat(msg, str);
-
-        msg_size = strlen(msg);
-        
-        skb_out = nlmsg_new(msg_size, 0);
-        if (!skb_out) {
-            printk(KERN_ERR "Failed to allocate new skb\n");
-            return NF_ACCEPT;
-        }
-
-        nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
-        NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
-        strncpy(nlmsg_data(nlh), msg, msg_size);
-
-        res = nlmsg_unicast(nl_sk, skb_out, pid);
-        if (res < 0)
-        {
-            printk(KERN_INFO "Error while sending bak to user\n");
-            pid = -1;
-        }
+    skb_out = nlmsg_new(msg_size, 0);
+    if (!skb_out) {
+        printk(KERN_ERR "Failed to allocate new skb\n");
+        return NF_ACCEPT;
     }
-    else
+
+    //invio messaggio in broadcast
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+    //NETLINK_CB(skb_out).dst_group = 1;
+    strncpy(nlmsg_data(nlh), msg, msg_size);
+
+    res = nlmsg_multicast(nl_sk, skb_out, 0, 27, GFP_KERNEL);
+    if (res < 0)
     {
-        printk(KERN_INFO "Error, pid not configured\n");
+        printk(KERN_INFO "Error while sending back to user\n");
     }
 
     return NF_ACCEPT;
@@ -162,11 +151,11 @@ int firewall_init(void){
     hook1.priority = NF_IP_PRI_FIRST;
     nf_register_net_hook(&init_net, &hook1);
 
-    hook2.hook = printInfo;
-    hook2.hooknum = NF_INET_LOCAL_OUT;
-    hook2.pf = PF_INET;
-    hook2.priority = NF_IP_PRI_FIRST;
-    nf_register_net_hook(&init_net, &hook2);
+    //hook2.hook = printInfo;
+    //hook2.hooknum = NF_INET_LOCAL_OUT;
+    //hook2.pf = PF_INET;
+    //hook2.priority = NF_IP_PRI_FIRST;
+    //nf_register_net_hook(&init_net, &hook2);
 
     //Inizializzo netlink
     printk(KERN_INFO "-- Registering Netlink --\n");
@@ -174,7 +163,7 @@ int firewall_init(void){
         .input = set_netlink_pid,
     };
 
-    nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &cfg);
+    nl_sk = netlink_kernel_create(&init_net, NETLINK_USERSOCK, &cfg);
     if (!nl_sk) {
         printk(KERN_ALERT "Error creating socket.\n");
         return -10;
@@ -186,6 +175,7 @@ int firewall_init(void){
 void firewall_exit(void){
     printk(KERN_INFO "-- Removing Filters --\n");
     nf_unregister_net_hook(&init_net, &hook1);
+    //nf_unregister_net_hook(&init_net, &hook2);
 
     //Release netlink
     printk(KERN_INFO "-- Removing Netlink --\n");

@@ -17,8 +17,8 @@ struct msghdr msg;
 
 int main()
 {
-    int max_read = 100;
-    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USER);
+    int max_read = 1000;
+    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USERSOCK);
     if (sock_fd < 0)
         return -1;
 
