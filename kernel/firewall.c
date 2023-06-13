@@ -90,10 +90,10 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
 		return NF_ACCEPT;
 	}
     */
-    if (iph->protocol == IPPROTO_ICMP && state->hook == NF_INET_LOCAL_IN) {
+    /*if (iph->protocol == IPPROTO_ICMP && state->hook == NF_INET_LOCAL_IN) {
         printk(KERN_INFO "Drop ICMP (pong) packet \n");
         return NF_DROP;   // drop TCP packet
-    }
+    }*/
 
     switch (state->hook){
         case NF_INET_PRE_ROUTING: printk("*** PRE ROUTING"); break;
@@ -121,7 +121,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
         char str[20];
         memset(str,0,strlen(str));
 
-        sprintf(str, "%p", &(iph->saddr));
+        sprintf(str, "%pI4", &(iph->saddr));
 
         char msg[50] = "Ricevuto pacchetto da ";
 
