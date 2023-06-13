@@ -115,12 +115,18 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     // pkt_hex_dump(skb);
 
     //invio dato ricevuto a user space
-    //char* str;
-    //inet_ntop(AF_INET, &(iph->saddr), str, INET_ADDRSTRLEN);
+    
     if(pid != -1)
     {
-        char* msg = "Ricevuto pacchetto";
-    
+        char str[20];
+        memset(str,0,strlen(str));
+
+        sprintf(str, "%p", &(iph->saddr));
+
+        char msg[50] = "Ricevuto pacchetto da ";
+
+        strcat(msg, str);
+
         msg_size = strlen(msg);
         
         skb_out = nlmsg_new(msg_size, 0);
@@ -135,7 +141,10 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
 
         res = nlmsg_unicast(nl_sk, skb_out, pid);
         if (res < 0)
+        {
             printk(KERN_INFO "Error while sending bak to user\n");
+            pid = -1;
+        }
     }
     else
     {
