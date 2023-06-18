@@ -15,6 +15,8 @@
 static struct nf_hook_ops hook1, hook2;
 struct sock *nl_sk = NULL;
 static int pid = -1;
+static int seq = 0;
+static int buffer_size = 0;
 
 void pkt_hex_dump(struct sk_buff *skb)
 {
@@ -113,12 +115,13 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     printk("\t Seq: %d", ntohl(tcph->seq));
     printk("\t Size: %d", tcp_len);
     printk("\t Data: %s", user_data);
-    printk("\t Pid: %d", pid);
+    printk("\t Pid: %d\n", pid);
     // pkt_hex_dump(skb);
 
     //invio dato ricevuto a user space
-    
-    if(pid != -1)
+    buffer_size = (buffer_size + 1) % 50;
+
+    if(pid != -1 && buffer_size == 0)
     {
         char str[20];
         memset(str,0,strlen(str));
@@ -137,9 +140,14 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
             return NF_ACCEPT;
         }
 
-        nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+        nlh = nlmsg_put(skb_out, 0, seq, NLMSG_DONE, msg_size, 0);
         NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
         strncpy(nlmsg_data(nlh), msg, msg_size);
+
+        if(seq + msg_size + 1 > 4294967295)
+            seq = 0;
+        
+        seq = seq + msg_size + 1;
 
         res = nlmsg_unicast(nl_sk, skb_out, pid);
         if (res < 0)
@@ -150,7 +158,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     }
     else
     {
-        printk(KERN_INFO "Error, pid not configured\n");
+        printk(KERN_INFO "Error, pid/buffer not configured\n");
     }
 
     return NF_ACCEPT;
@@ -176,7 +184,7 @@ int firewall_init(void){
         .input = set_netlink_pid,
     };
 
-    nl_sk = netlink_kernel_create(&init_net, NETLINK_USERSOCK, &cfg);
+    nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &cfg);
     if (!nl_sk) {
         printk(KERN_ALERT "Error creating socket.\n");
         return -10;
