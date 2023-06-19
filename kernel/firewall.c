@@ -119,20 +119,11 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     // pkt_hex_dump(skb);
 
     //invio dato ricevuto a user space
-    buffer_size = (buffer_size + 1) % 50;
+    // buffer_size = (buffer_size + 1) % 50;
 
-    if(pid != -1 && buffer_size == 0)
-    {
-        char str[20];
-        memset(str,0,strlen(str));
 
-        sprintf(str, "%pI4", &(iph->saddr));
-
-        char msg[50] = "Ricevuto pacchetto da ";
-
-        strcat(msg, str);
-
-        msg_size = strlen(msg);
+    if(pid != -1 /*&& buffer_size == 0*/){
+        msg_size = 24; // xxx.xxx.xxx.xxx:yyyyy0
         
         skb_out = nlmsg_new(msg_size, 0);
         if (!skb_out) {
@@ -142,22 +133,17 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
 
         nlh = nlmsg_put(skb_out, 0, seq, NLMSG_DONE, msg_size, 0);
         NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
-        strncpy(nlmsg_data(nlh), msg, msg_size);
+        snprintf(nlmsg_data(nlh), msg_size, "%pI4:%d\0", &(iph->saddr), ntohs(tcph->source));
 
-        if(seq + msg_size + 1 > 4294967295)
-            seq = 0;
-        
-        seq = seq + msg_size + 1;
+        seq = (seq + msg_size + 1) % 4294967295;
 
         res = nlmsg_unicast(nl_sk, skb_out, pid);
-        if (res < 0)
-        {
+        if (res < 0){
             printk(KERN_INFO "Error while sending bak to user\n");
             pid = -1;
         }
     }
-    else
-    {
+    else{
         printk(KERN_INFO "Error, pid/buffer not configured\n");
     }
 
