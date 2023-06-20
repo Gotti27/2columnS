@@ -1,26 +1,34 @@
-import os
 import socket
 import struct
 
+NETLINK_MYGROUP = 2
 
-# sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USER);
 sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_USERSOCK)
 
-sock.bind((0,0))
-sock.setsockopt(270, 1, 31)
+sock.bind((0, NETLINK_MYGROUP))
 
-sock.send("Hello py".encode())
+print("Sending msg")
 
-#
-#sock2 = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-#sock2.bind((os.getpid(),0))
-#data = sock2.recv(65535)
-#
-#msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", data[:16])
-#
-#print(msg_len)
-#print(msg_type)
-#print(flags)
-#print(pid)
-#
-###
+msg_data = b"Netlink connection established\x00"
+msg_len = 16 + len(msg_data)
+
+
+msg = msg_len.to_bytes(4, 'little') + b"\x03\x00" + b"\x00"*2 + b"\x00"*4 + b"\xb3\x15\x00\x00" + b"Netlink connection established\x00"
+
+sock.send(msg)
+
+
+print("Starting reciving.....")
+while True:
+    data = sock.recvmsg(1024)[0]
+    msg_hdr = data[:16]
+
+    msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", msg_hdr)
+    msg_data = data[16:msg_len]
+    print(f"msg_len: {msg_len}")
+    print(f"msg_type: {msg_type}")
+    print(f"flags: {flags}")
+    print(f"seq: {seq}")
+    print(f"pid: {pid}")
+    print(f"msg_data: {msg_data}")
+    print()
