@@ -17,10 +17,13 @@ packet_size
 flow features:
 The flow is the union of last minute packet
 
-max ip per mac
 number of packets
 number of connections (4-tuple)
-mean of interarrival ????
+mean of interarrival ???? --REJECTED
 mean of connections for each src_ip
-
+max ip per mac --REJECTED
+number of establishing connections
+number of established connections
+mean of number of packets per connection
+mean of packet sizes
 
