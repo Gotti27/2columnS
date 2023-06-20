@@ -137,7 +137,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
                  ether->h_source[0], ether->h_source[1], ether->h_source[2], ether->h_source[3], ether->h_source[4], ether->h_source[5], // src MAC
                  ether->h_dest[0], ether->h_dest[1], ether->h_dest[2], ether->h_dest[3], ether->h_dest[4], ether->h_dest[5], // dest MAC
                  iph->protocol,
-                 iph->tot_len / 8,
+                 ip_len,
                  tcph->syn ? '1' : '0',
                  tcph->ack ? '1' : '0'
                  //timestamp
