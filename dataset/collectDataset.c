@@ -5,7 +5,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <time.h>
-
+ 
+#define _POSIX_C_SOURCE 199309L
+#include <stdio.h>
+#include <time.h>
+#include <stdint.h>
+#include <inttypes.h>
+#define BILLION  1000000000L
 #define NETLINK_USER 31
 
 #define MAX_PAYLOAD 1024 /* maximum payload size*/
@@ -56,12 +62,22 @@ int main() {
 
         recvmsg(sock_fd, &msg, 0);
 
-	struct timespec ts;
-    	timespec_get(&ts, TIME_UTC);
+
+
+
+	long int ns;
+	uint64_t all;
+	time_t sec;
+	struct timespec spec;
+	clock_gettime(CLOCK_REALTIME, &spec);
+	sec = spec.tv_sec;
+	ns = spec.tv_nsec;
+
+	all = (uint64_t) sec * BILLION + (uint64_t) ns;
+
     	char buff[100];
-   	strftime(buff, sizeof buff, "%T", gmtime(&ts.tv_sec));
         printf("%s,", NLMSG_DATA(nlh));
-   	printf("%s.%09ld \n", buff, ts.tv_nsec);
+   	printf("%"PRIu64"\n", all);
 	setvbuf(stdout, NULL, _IOLBF, 0);
     }
     close(sock_fd);
