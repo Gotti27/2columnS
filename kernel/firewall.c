@@ -8,9 +8,9 @@
 #include <linux/icmp.h>
 #include <linux/skbuff.h>
 #include <linux/inet.h>
-//#include <net/sock.h>
 #include <linux/netlink.h>
-#define NETLINK_USER 31
+
+#define NETLINK_MYGROUP 2
 
 static struct nf_hook_ops hook1, hook2;
 struct sock *nl_sk = NULL;
@@ -123,19 +123,16 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     if(pid != -1 /*&& buffer_size == 0*/){
         msg_size = 24; // xxx.xxx.xxx.xxx:yyyyy0
         
-        skb_out = nlmsg_new(msg_size, 0);
+        skb_out = nlmsg_new(msg_size, GFP_KERNEL);
         if (!skb_out) {
             printk(KERN_ERR "Failed to allocate new skb\n");
             return NF_ACCEPT;
         }
 
-        nlh = nlmsg_put(skb_out, 0, seq, NLMSG_DONE, msg_size, 0);
-        NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
+        nlh = nlmsg_put(skb_out, 0, seq++, NLMSG_DONE, msg_size, 0);
         snprintf(nlmsg_data(nlh), msg_size, "%pI4:%d\0", &(iph->saddr), ntohs(tcph->source));
 
-        seq = (seq + msg_size + 1) % 4294967295;
-
-        res = nlmsg_unicast(nl_sk, skb_out, pid);
+        res = nlmsg_multicast(nl_sk, skb_out, 0, NETLINK_MYGROUP, GFP_KERNEL);
         if (res < 0){
             printk(KERN_INFO "Error while sending bak to user\n");
             pid = -1;
@@ -168,7 +165,7 @@ int firewall_init(void){
         .input = set_netlink_pid,
     };
 
-    nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &cfg);
+    nl_sk = netlink_kernel_create(&init_net, NETLINK_USERSOCK, &cfg);
     if (!nl_sk) {
         printk(KERN_ALERT "Error creating socket.\n");
         return -10;
