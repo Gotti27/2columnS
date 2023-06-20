@@ -5,6 +5,7 @@
 #define NETLINK_USER 31
 
 struct sock *nl_sk = NULL;
+static int pid = -1;
 
 static void hello_nl_recv_msg(struct sk_buff *skb)
 {

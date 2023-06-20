@@ -14,8 +14,10 @@ struct iovec iov;
 int sock_fd;
 struct msghdr msg;
 
+
 int main()
 {
+    int max_read = 1000;
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USER);
     if (sock_fd < 0)
         return -1;
@@ -37,7 +39,7 @@ int main()
     nlh->nlmsg_pid = getpid();
     nlh->nlmsg_flags = 0;
 
-    strcpy(NLMSG_DATA(nlh), "Hello");
+    strcpy(NLMSG_DATA(nlh), "Netlink connection established");
 
     iov.iov_base = (void *)nlh;
     iov.iov_len = nlh->nlmsg_len;
@@ -50,8 +52,15 @@ int main()
     sendmsg(sock_fd, &msg, 0);
     printf("Waiting for message from kernel\n");
 
-    /* Read message from kernel */
     recvmsg(sock_fd, &msg, 0);
     printf("Received message payload: %s\n", NLMSG_DATA(nlh));
+    /* Read message from kernel */
+    int i = 0;
+    while(i<max_read)
+    {
+        recvmsg(sock_fd, &msg, 0);
+        printf("Received message payload: %s\n", NLMSG_DATA(nlh));
+        i++;
+    }
     close(sock_fd);
 }
