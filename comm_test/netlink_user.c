@@ -39,7 +39,7 @@ int main()
     nlh->nlmsg_pid = getpid();
     nlh->nlmsg_flags = 0;
 
-    strcpy(NLMSG_DATA(nlh), "Mona");
+    strcpy(NLMSG_DATA(nlh), "Netlink connection established");
 
     iov.iov_base = (void *)nlh;
     iov.iov_len = nlh->nlmsg_len;
