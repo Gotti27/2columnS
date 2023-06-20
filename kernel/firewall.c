@@ -68,7 +68,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     struct sk_buff *skb_out;
     int msg_size;
     int res;
-    int tcp_len;
+    int ip_len;
     struct iphdr *iph;
     struct tcphdr *tcph;
     struct udphdr *udph;
@@ -85,7 +85,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     iph = ip_hdr(skb);
     tcph = tcp_hdr(skb);
     ether = eth_hdr(skb);
-    tcp_len = ntohs(iph->tot_len);
+    ip_len = ntohs(iph->tot_len);
     user_data = (unsigned char *)((unsigned char *)tcph + (tcph->doff * 4));
 
     /*
@@ -108,19 +108,17 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
         default: printk("*** DEFAULT");
     }
 
+    unsigned char* charEth=(unsigned char*)ether;
+
     printk("\t %pI4:%d --> %pI4:%hu\n", &(iph->saddr), ntohs(tcph->source), &(iph->daddr), ntohs(tcph->dest));
-    printk("\t Protocol: %d\n", ether->h_proto);
+    printk("\t Protocol: %02x %02x\n", charEth[0], charEth[1]);
     printk("\t Source: %x:%x:%x:%x:%x:%x\n", ether->h_source[0], ether->h_source[1], ether->h_source[2], ether->h_source[3], ether->h_source[4], ether->h_source[5]);
     printk("\t Destination: %x:%x:%x:%x:%x:%x\n", ether->h_dest[0], ether->h_dest[1], ether->h_dest[2], ether->h_dest[3], ether->h_dest[4], ether->h_dest[5]);
     printk("\t Seq: %d", ntohl(tcph->seq));
-    printk("\t Size: %d", tcp_len);
+    printk("\t Size: %d", ip_len);
     printk("\t Data: %s", user_data);
     printk("\t Pid: %d\n", pid);
     // pkt_hex_dump(skb);
-
-    //invio dato ricevuto a user space
-    // buffer_size = (buffer_size + 1) % 50;
-
 
     if(pid != -1 /*&& buffer_size == 0*/){
         msg_size = 24; // xxx.xxx.xxx.xxx:yyyyy0
