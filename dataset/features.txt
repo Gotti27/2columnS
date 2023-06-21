@@ -1,0 +1,29 @@
+packet features:
+
+
+src_ip
+dst_ip
+src_port
+dst_port
+scr_mac
+dst_mac
+timestamp // mario
+protocol lev3
+packet_size
+
+
+---------
+
+flow features:
+The flow is the union of last minute packet
+
+number of packets
+number of connections (4-tuple)
+mean of interarrival ???? --REJECTED
+mean of connections for each src_ip
+max ip per mac --REJECTED
+number of establishing connections
+number of established connections
+mean of number of packets per connection
+mean of packet sizes
+

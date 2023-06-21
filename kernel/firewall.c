@@ -121,7 +121,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
     // pkt_hex_dump(skb);
 
     if(pid != -1 /*&& buffer_size == 0*/){
-        msg_size = 24; // xxx.xxx.xxx.xxx:yyyyy0
+        msg_size = 100; // xxx.xxx.xxx.xxx:yyyyy0
         
         skb_out = nlmsg_new(msg_size, 0);
         if (!skb_out) {
@@ -131,7 +131,17 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
 
         nlh = nlmsg_put(skb_out, 0, seq, NLMSG_DONE, msg_size, 0);
         NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
-        snprintf(nlmsg_data(nlh), msg_size, "%pI4:%d\0", &(iph->saddr), ntohs(tcph->source));
+        snprintf(nlmsg_data(nlh), msg_size, "%pI4,%pI4,%d,%d,%x:%x:%x:%x:%x:%x,%x:%x:%x:%x:%x:%x,%02x,%hu,%c,%c",
+                 &(iph->saddr), &(iph->daddr), // src/dest ip
+                 ntohs(tcph->source), ntohs(tcph->dest), // src/dest port
+                 ether->h_source[0], ether->h_source[1], ether->h_source[2], ether->h_source[3], ether->h_source[4], ether->h_source[5], // src MAC
+                 ether->h_dest[0], ether->h_dest[1], ether->h_dest[2], ether->h_dest[3], ether->h_dest[4], ether->h_dest[5], // dest MAC
+                 iph->protocol,
+                 ip_len,
+                 tcph->syn ? '1' : '0',
+                 tcph->ack ? '1' : '0'
+                 //timestamp
+                 );
 
         seq = (seq + msg_size + 1) % 4294967295;
 
