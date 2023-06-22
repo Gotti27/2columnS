@@ -11,7 +11,7 @@
 #include <linux/netlink.h>
 #include <linux/timekeeping.h>
 
-#define NETLINK_GROUP 2
+#define NETLINK_USER 31
 
 static struct nf_hook_ops hook_in;
 struct sock *nl_sk = NULL;
@@ -67,7 +67,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
 	     );
 
 
-    res = nlmsg_multicast(nl_sk, skb_out, 0, NETLINK_GROUP, GFP_KERNEL);
+    res = nlmsg_unicast(nl_sk, skb_out, pid);
     if (res < 0){
         printk(KERN_ERR "Error while sending to user\n");
         pid = -1;
@@ -90,7 +90,7 @@ int firewall_init(void){
 
     // Netlink initialization
     printk(KERN_INFO "-- Initializing Netlink --\n");
-    nl_sk = netlink_kernel_create(&init_net, NETLINK_USERSOCK, &cfg);
+    nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &cfg);
     if (!nl_sk) {
         printk(KERN_CRIT "Error creating socket.\n");
         return -10;

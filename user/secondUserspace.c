@@ -5,6 +5,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <time.h>
+
+#include <pthread.h>
  
 #define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
@@ -56,6 +58,10 @@ int main() {
 
 
     sendmsg(sock_fd, &msg, 0);
+
+
+    pthread_t id[2];
+    // pthread_create(&id[0], NUI
     
     /* Read message from kernel */
     while (1) {
