@@ -1,0 +1,164 @@
+#!/bin/python3
+
+import socket
+import struct
+import threading
+
+import time
+import logging
+from systemd.journal import JournalHandler
+
+
+import pandas
+import joblib
+
+def mean(l):
+    if len(l) == 0:
+        return 0
+    return round(sum(l)/len(l), 2)
+
+
+def parse_window(window):
+    d = []
+
+    connections = [] 
+    packets_per_conn = {}
+    
+    for w in window:
+        c = (w[0],w[2],w[1],w[3])
+        if c not in connections:
+            connections.append(c)
+            packets_per_conn[c] = 0
+
+        packets_per_conn[c] += 1
+
+    sources = list(set([c[0] for c in connections]))
+
+    d.append(len(window))
+    d.append(len(connections))
+    d.append(mean([len(list(filter(lambda c: c[0] == s, connections))) for s in sources]))
+    
+    # macs = list(set([(w[4], w[0]) for w in window]))
+    # print(macs)
+    # d.append( max(  same_mac.values() ) if len(macs.values()) > 0 else 0)
+
+    establishing = list(set(map(lambda e: (e[0],e[2],e[1],e[3]), list(filter(lambda w: w[-3] == 1, window)))))
+
+    d.append(len(establishing))
+    # d.append(len(connections) - len(establishing))
+    d.append(mean(list(map(lambda w: w[-4], window))))
+    
+    """
+    for c in connections:
+
+    for w in window:
+        c = (w[0],w[2],w[1],w[3])
+    
+    """
+
+    d.append(mean(packets_per_conn.values()))
+
+    return d
+
+
+
+
+model = joblib.load('svm_model.pkl')
+
+
+
+NETLINK_MYGROUP = 2
+
+sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_USERSOCK)
+
+sock.bind((0, NETLINK_MYGROUP))
+
+print("Sending msg")
+
+msg_data = b"Netlink connection established\x00"
+msg_len = 16 + len(msg_data)
+
+
+msg = msg_len.to_bytes(4, 'little') + b"\x03\x00" + b"\x00"*2 + b"\x00"*4 + b"\xb3\x15\x00\x00" + b"Netlink connection established\x00"
+
+sock.send(msg)
+
+
+print("Starting reciving.....")
+
+window = []
+
+def check_older(older, newer):
+    # return false if older is more than 1 minute older than newer
+    return older[-1] >= newer[-1] - 60e9
+
+def classify(window):
+    if len(window) == 0:
+        return
+    last = window[-1]
+    window = list(filter(lambda p: check_older(p, last), window))
+    flow = parse_window(window)
+
+    prediction = model.predict([flow])
+
+    log = logging.getLogger('2columnS')
+    log.addHandler(JournalHandler())
+    log.setLevel(logging.INFO)
+
+    log.info(prediction)
+    print(prediction)
+#    if model.predict([flow])[0] == -1:
+#       log = logging.getLogger('2columnS')
+#      log.addHandler(JournalHandler())
+#     log.setLevel(logging.INFO)
+#    log.info("Anomaly Detected")
+
+
+classifier = threading.Thread(target=classify, args=(window,), daemon=True) 
+classifier.start()
+
+while True:
+
+    sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_USERSOCK)
+    sock.bind((0, NETLINK_MYGROUP))
+
+    data = ''
+    try:
+        data = sock.recvmsg(1024)[0]
+    except OSError:
+        log = logging.getLogger('2columnS')
+        log.addHandler(JournalHandler())
+        log.setLevel(logging.INFO)
+        log.info("Anomaly detected")
+        
+        continue
+
+    
+    msg_hdr = data[:16]
+    
+    msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", msg_hdr)
+    msg_data = data[16:msg_len].strip(b'\x00').decode()
+
+    p = msg_data.split(',')
+
+    '''
+
+
+    p[2] = float(p[2])
+    p[3] = float(p[3])
+    p[6]= float(p[6])
+    p[7]= float(p[7])
+    p[8]= float(p[8])
+    p[9]= float(p[9])
+    p[10]= float(p[10])
+
+    window.append(p)
+    
+    print(classifier.is_alive())
+
+    if not classifier.is_alive():
+        classifier = threading.Thread(target=classify, args=(window,), daemon=True) 
+        classifier.start()
+    
+    '''
+

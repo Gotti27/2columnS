@@ -31,10 +31,10 @@ def parse_window(window):
     # print(macs)
     # d.append( max(  same_mac.values() ) if len(macs.values()) > 0 else 0)
 
-    establishing = list(set(map(lambda e: (e[0],e[2],e[1],e[3]), list(filter(lambda w: w[-2] == 1 and w[-3] == 1, window)))))
+    establishing = list(set(map(lambda e: (e[0],e[2],e[1],e[3]), list(filter(lambda w: w[-3] == 1, window)))))
 
     d.append(len(establishing))
-    d.append(len(connections) - len(establishing))
+   # d.append(len(connections) - len(establishing))
     d.append(mean(list(map(lambda w: w[-4], window))))
     
     """

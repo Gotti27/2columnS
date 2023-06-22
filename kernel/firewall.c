@@ -9,6 +9,7 @@
 #include <linux/skbuff.h>
 #include <linux/inet.h>
 #include <linux/netlink.h>
+#include <linux/timekeeping.h>
 
 #define NETLINK_GROUP 2
 
@@ -53,7 +54,7 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
 
     nlh = nlmsg_put(skb_out, 0, seq++, NLMSG_DONE, msg_size, 0);
     NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
-    snprintf(nlmsg_data(nlh), msg_size, "%pI4,%pI4,%d,%d,%x:%x:%x:%x:%x:%x,%x:%x:%x:%x:%x:%x,%02x,%hu,%c,%c",
+    snprintf(nlmsg_data(nlh), msg_size, "%pI4,%pI4,%d,%d,%x:%x:%x:%x:%x:%x,%x:%x:%x:%x:%x:%x,%02x,%hu,%c,%c,%llu",
              &(iph->saddr), &(iph->daddr), // src/dest ip
              ntohs(tcph->source), ntohs(tcph->dest), // src/dest port
              ether->h_source[0], ether->h_source[1], ether->h_source[2], ether->h_source[3], ether->h_source[4], ether->h_source[5], // src MAC
@@ -61,9 +62,9 @@ unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_sta
              iph->protocol, // ip protocol
              ip_len, // total packet length
              tcph->syn ? '1' : '0', // syn flag
-             tcph->ack ? '1' : '0' // ack flag
-             // timestamp
-             );
+             tcph->ack ? '1' : '0', // ack flag
+             ktime_get_real_ns()              
+	     );
 
 
     res = nlmsg_multicast(nl_sk, skb_out, 0, NETLINK_GROUP, GFP_KERNEL);

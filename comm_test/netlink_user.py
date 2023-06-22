@@ -24,7 +24,7 @@ while True:
     msg_hdr = data[:16]
 
     msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", msg_hdr)
-    msg_data = data[16:msg_len]
+    msg_data = data[16:msg_len].strip(b'\x00')
     print(f"msg_len: {msg_len}")
     print(f"msg_type: {msg_type}")
     print(f"flags: {flags}")
