@@ -36,7 +36,7 @@ typedef struct rule_list_struct {
 	struct rule_list_struct *next;
 } *rule_list;
 
-static rule_list r_list;
+static rule_list r_list = NULL;
 
 void clean_rule_list(void) {
 	//free the linked list
@@ -50,40 +50,55 @@ void clean_rule_list(void) {
 }
 
 void create_rule(rule r) {
-	rule_list next;
 	rule_list curr;
 	if (r_list == NULL) {
-		r_list = (rule_list) kmalloc(sizeof(struct rule_list_struct*), GFP_USER);
-		(r_list)->data = (rule) kmalloc(sizeof(struct rule_struct*), GFP_USER );
+		r_list = (rule_list) kmalloc(sizeof(struct rule_list_struct), GFP_KERNEL);
+		(r_list)->data = (rule) kmalloc(sizeof(struct rule_struct), GFP_KERNEL );
 
-		strcpy(r->source, r_list->data->source);
-		strcpy(r->destination, r_list->data->destination);
+		strncpy(r_list->data->source, r->source, 16);
+		strncpy(r_list->data->destination, r->destination, 16);
 		r_list->data->port = r->port;
 		r_list->data->protocol = r->protocol;
 		r_list->data->action = r->action;
+
+		r_list->next = NULL;
 		return;
 	}
 
-	next = (r_list)->next;
+	curr = r_list;
 
-	while (next != NULL) {
-		curr = next;
-		next = (curr)->next;
+	while (curr->next != NULL) {
+		curr = curr->next;
 	}
 
-	(curr)->next = (rule_list) kmalloc(sizeof(struct rule_list_struct*), GFP_USER );
-	(curr)->next->data = (rule) kmalloc(sizeof(struct rule_struct*), GFP_USER );
+	(curr)->next = (rule_list) kmalloc(sizeof(struct rule_list_struct), GFP_KERNEL);
+	(curr)->next->data = (rule) kmalloc(sizeof(struct rule_struct), GFP_KERNEL);
 	
-	strcpy(r->source, curr->next->data->source);
-	strcpy(r->destination, curr->next->data->destination);
+	strncpy(curr->next->data->source, r->source, 16);
+	strncpy(curr->next->data->destination, r->destination, 16);
 	curr->next->data->port = r->port;
 	curr->next->data->protocol = r->protocol;
 	curr->next->data->action = r->action;
+	curr->next->next = NULL;
 }
 
 
 void print_list(void) {
+	rule_list curr = r_list;
+	int index = 0;
 	
+	if (curr == NULL) {
+		printk(KERN_INFO "the list is empty\n");
+		return;
+	}
+
+	printk(KERN_INFO "begin printing rules\n");
+	while (curr != NULL) {
+		printk(KERN_INFO "rule %d: source %s\n\tdest: %s\n\tport: %hd\n\tproto: %x\n\taction: %x\n", index, curr->data->source, curr->data->destination, curr->data->port, curr->data->protocol, curr->data->action);
+		curr = curr->next;
+		index++;
+	}
+	printk(KERN_INFO "end printing rules\n");
 }
 
 static void set_netlink_pid(struct sk_buff *skb){
@@ -93,6 +108,7 @@ static void set_netlink_pid(struct sk_buff *skb){
     nlh = (struct nlmsghdr *)skb->data;
     printk(KERN_INFO "Netlink received msg payload: %s\n", (char *)nlmsg_data(nlh));
     
+    print_list();
     payload = (char *)nlmsg_data(nlh);
 
     printk(KERN_INFO "%ld\n", strlen(payload)); 
@@ -108,10 +124,12 @@ static void set_netlink_pid(struct sk_buff *skb){
 			LOCK = 1;
 			printk(KERN_INFO "IN chain locked!");
 			clean_rule_list();
+			print_list();
 		} else if (strncmp(msg_rule, "UNLOCK", 6) == 0) {
 			LOCK = 0;
 			printk(KERN_INFO "IN chain unlocked!");
 			clean_rule_list();
+			print_list();
 		} else if (strncmp(msg_rule, "DEFAULT", 7) == 0) {
 			msg_rule += 8;
 			if (strncmp(msg_rule, "DROP", 7) == 0) {
@@ -127,9 +145,14 @@ static void set_netlink_pid(struct sk_buff *skb){
 		create_rule(r);
 
 		printk(KERN_INFO "rule: source %s\n\tdest: %s\n\tport: %hd\n\tproto: %x\n\taction: %x\n", r->source, r->destination, r->port, r->protocol, r->action);
+
+		print_list();
 	}
 
     }
+
+
+    print_list();
 
     pid = nlh->nlmsg_pid; /*pid of sending process */
 }
