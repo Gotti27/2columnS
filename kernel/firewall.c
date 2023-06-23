@@ -157,6 +157,47 @@ static void set_netlink_pid(struct sk_buff *skb){
     pid = nlh->nlmsg_pid; /*pid of sending process */
 }
 
+
+unsigned int match_rules(struct ethhdr *ether, struct iphdr *iph, struct tcphdr *tcph) {
+	rule_list curr = r_list;
+	char packet_source[16];
+	char packet_dest[16];
+	int index = 0;
+	
+	snprintf(packet_source, 16, "%pI4", &(iph->saddr));
+	snprintf(packet_dest, 16, "%pI4", &(iph->daddr));
+
+	while (curr != NULL) {
+		rule rule = curr->data;
+		int match;
+	        match = 0;
+
+		int source_match = strncmp(rule->source, "*", 1) == 0 || strncmp(rule->source, packet_source, 16) == 0;
+
+		int dest_match = strncmp(rule->destination, "*", 1) == 0 || strncmp(rule->destination, packet_dest, 16) == 0;
+		
+		int port_match = rule->port == 0 || ntohs(tcph->dest) == rule->port;
+
+		/*
+		char protocol[4];
+	       	snprintf(protocol, 4, "%02x", iph->protocol);
+		
+		printk(KERN_INFO "%s", protocol);
+
+		*/
+		int proto_match = rule->protocol == 420; // || (int)kstrtol(protocol, NULL, 16) == rule->protocol;	
+
+		if (source_match && dest_match && port_match && proto_match ) {
+			printk(KERN_DEBUG "rule %d match\n", index);
+			return rule->action;
+		}
+		curr = curr->next;
+		index++;
+	}	
+	return 0; //don't drop
+}
+
+
 unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook_state *state){
     struct nlmsghdr *nlh;
     struct sk_buff *skb_out;
@@ -169,7 +210,15 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
     	return NF_DROP;
     }
 
-    // check rules
+
+    iph = ip_hdr(skb);
+    tcph = tcp_hdr(skb);
+    ether = eth_hdr(skb);
+    ip_len = ntohs(iph->tot_len);
+   
+    if (match_rules(ether, iph, tcph)) {
+    	return NF_DROP;
+    }
 
     if (pid == -1) {
         printk(KERN_ERR "Pid or Buffer not configured\n");
@@ -178,10 +227,6 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
 
     msg_size = 100;
 
-    iph = ip_hdr(skb);
-    tcph = tcp_hdr(skb);
-    ether = eth_hdr(skb);
-    ip_len = ntohs(iph->tot_len);
 
     skb_out = nlmsg_new(msg_size, GFP_KERNEL);
     if (!skb_out) {
