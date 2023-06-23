@@ -1,0 +1,42 @@
+#!/bin/python3
+
+import os
+import sys
+
+print("--- 2columnS installation script ---")
+
+if os.getuid() != 0:
+    print("ERROR - Root privileges required")
+    sys.exit(1)
+
+
+print("\t Installing kernel module")
+os.system("cd kernel && make && sudo insmod firewall.ko")
+
+print("\t Kernel module installed")
+
+print("\t Installing user space daemon")
+
+with open('/etc/systemd/system/2columnS.service', 'w') as f:
+    f.write(f'''
+    [Unit]
+    Description=2columnS - a ML based NIDS
+    
+    [Service]
+    User=root
+    WorkingDirectory={os.getcwd()}/user/
+    ExecStart={os.getcwd()}/user/userspace
+    Restart=no
+    Environment="DISPLAY=:0" "XAUTHORITY=/home/seed/.Xauthority"
+    RemainAfterExit=yes
+
+    [Install]
+    WantedBy=multi-user.target
+    ''')
+
+os.system('sudo systemctl daemon-reload')
+
+print("\t User space daemon installed")
+
+print("--- installation complete ---")
+
