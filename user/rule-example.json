@@ -1,0 +1,13 @@
+{
+	"lock": "false/true",
+	"rules": [
+		{
+			"source": "sourceIp",
+			"destination": "destinationIp",
+			"port":"portNumber",
+			"protocol":"protoNumber",
+			"action": "accept/drop"
+		}
+	],
+	"default": "drop/accept"
+}
