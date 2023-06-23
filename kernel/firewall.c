@@ -19,27 +19,116 @@ struct sock *nl_sk = NULL;
 static int pid = -1;
 static unsigned int seq = 0;
 static int LOCK = 0;
+static int DEFAULT = 0;
+
+
+typedef struct rule_struct {
+	char source[16];
+	char destination[16];
+	short port;
+	char protocol;
+	char action;
+} *rule;
+
+
+typedef struct rule_list_struct {
+	rule data;
+	struct rule_list_struct *next;
+} *rule_list;
+
+static rule_list r_list;
+
+void clean_rule_list(void) {
+	//free the linked list
+	rule_list next; 
+	
+	while (r_list != NULL) {
+		next = (r_list)->next;
+		kfree(r_list);
+		r_list = next;
+	}
+}
+
+void create_rule(rule r) {
+	rule_list next;
+	rule_list curr;
+	if (r_list == NULL) {
+		r_list = (rule_list) kmalloc(sizeof(struct rule_list_struct*), GFP_USER);
+		(r_list)->data = (rule) kmalloc(sizeof(struct rule_struct*), GFP_USER );
+
+		strcpy(r->source, r_list->data->source);
+		strcpy(r->destination, r_list->data->destination);
+		r_list->data->port = r->port;
+		r_list->data->protocol = r->protocol;
+		r_list->data->action = r->action;
+		return;
+	}
+
+	next = (r_list)->next;
+
+	while (next != NULL) {
+		curr = next;
+		next = (curr)->next;
+	}
+
+	(curr)->next = (rule_list) kmalloc(sizeof(struct rule_list_struct*), GFP_USER );
+	(curr)->next->data = (rule) kmalloc(sizeof(struct rule_struct*), GFP_USER );
+	
+	strcpy(r->source, curr->next->data->source);
+	strcpy(r->destination, curr->next->data->destination);
+	curr->next->data->port = r->port;
+	curr->next->data->protocol = r->protocol;
+	curr->next->data->action = r->action;
+}
+
+
+void print_list(void) {
+	
+}
 
 static void set_netlink_pid(struct sk_buff *skb){
     struct nlmsghdr *nlh;
+    char *payload; 
 
     nlh = (struct nlmsghdr *)skb->data;
     printk(KERN_INFO "Netlink received msg payload: %s\n", (char *)nlmsg_data(nlh));
     
-    char *payload = (char *)nlmsg_data(nlh);
+    payload = (char *)nlmsg_data(nlh);
 
     printk(KERN_INFO "%ld\n", strlen(payload)); 
    
     if (strncmp(payload, "RULE", 4) == 0) {
-	char *rule = payload + 5;
-	printk(KERN_INFO "oh look! a new rule %s\n", rule);
-	if (strncmp(rule, "LOCK", 4) == 0) {
-		LOCK = 1;
-		printk(KERN_INFO "IN chain locked!");
-	} else if (strncmp(rule, "UNLOCK", 6) == 0) {
-		LOCK = 0;
-		printk(KERN_INFO "IN chain unlocked!");
+	char *msg_rule = payload + 5;
+	rule r;
+	printk(KERN_INFO "oh look! a new rule %s\n", msg_rule);
+	
+	if (msg_rule[0] == '0') {
+		msg_rule++;	
+		if (strncmp(msg_rule, "LOCK", 4) == 0) {
+			LOCK = 1;
+			printk(KERN_INFO "IN chain locked!");
+			clean_rule_list();
+		} else if (strncmp(msg_rule, "UNLOCK", 6) == 0) {
+			LOCK = 0;
+			printk(KERN_INFO "IN chain unlocked!");
+			clean_rule_list();
+		} else if (strncmp(msg_rule, "DEFAULT", 7) == 0) {
+			msg_rule += 8;
+			if (strncmp(msg_rule, "DROP", 7) == 0) {
+				DEFAULT = 1;
+			} else {
+				DEFAULT = 0;
+			}
+		}
+	} else {
+		msg_rule++;
+		r = (rule) msg_rule;
+
+		create_rule(r);
+
+		printk(KERN_INFO "rule: source %s\n\tdest: %s\n\tport: %hd\n\tproto: %x\n\taction: %x\n", r->source, r->destination, r->port, r->protocol, r->action);
 	}
+
     }
 
     pid = nlh->nlmsg_pid; /*pid of sending process */
@@ -56,6 +145,8 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
     if (LOCK) {
     	return NF_DROP;
     }
+
+    // check rules
 
     if (pid == -1) {
         printk(KERN_ERR "Pid or Buffer not configured\n");

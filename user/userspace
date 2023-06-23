@@ -89,8 +89,24 @@ sock.send(msg)
 print("sending rules to kernel module")
 
 
-def send_msg_to_kernel(msg: str):
-    rule_data = f"RULE:{msg}".encode()
+def send_msg_to_kernel(msg, rule: bool):
+    rule_data = b''
+    if rule:
+        source = msg['source'].encode().ljust(16, b'\x00')  
+        #diff = 16 - len(source)
+        #source += b'\x00' * diff
+        destination = msg['destination'].encode().ljust(16, b'\x00')
+        #diff = 16 - len(destination)
+        #destination += b'\x00' * diff
+        port = msg['port'].to_bytes(2, 'little')
+        protocol = msg['protocol'].to_bytes(1, 'little')                                                    
+        action = msg['action'].to_bytes(1, 'little') 
+                                                                   
+        rule_data = b'RULE:1' + source + destination + port + protocol + action
+        print(rule_data)
+    else:
+        rule_data = f"RULE:0{msg}".encode()
+
     rule_len = 16 + len(rule_data)
     rule_msg = rule_len.to_bytes(4, 'little') + b"\x03\x00" + b"\x00"*2 + b"\x00"*4 + b"\xb3\x15\x00\x00" + rule_data 
 
@@ -100,20 +116,20 @@ with open('rules.json', "r") as rules_file:
     rules = json.loads(rules_file.read())
 
     if rules['lock'].lower() == 'true':
-        send_msg_to_kernel("LOCK")
+        send_msg_to_kernel("LOCK", False)
         print("--- IN networking locked ---")
     elif rules['lock'].lower() == 'false':
-        send_msg_to_kernel("UNLOCK")
+        send_msg_to_kernel("UNLOCK", False)
         print("--- IN networking unlocked ---")
     else:
         raise Exception("lock policy not valid, use 'true' or 'false'")
 
     for i in rules['rules']:
-        send_msg_to_kernel(i) 
+        send_msg_to_kernel(i, True) 
         print(f"rule {i} dispatched")
    
     default_policy = rules['default']
-    send_msg_to_kernel(f'DEFAULT-{default_policy}')
+    send_msg_to_kernel(f'DEFAULT-{default_policy}', False)
 
 print("Starting reciving.....")
 
