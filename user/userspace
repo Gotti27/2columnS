@@ -99,14 +99,16 @@ def classify(window):
     window = list(filter(lambda p: check_older(p, last), window))
     flow = parse_window(window)
 
-    prediction = model.predict([flow])
+    score = model.score_samples([flow])
 
     log = logging.getLogger('2columnS')
     log.addHandler(JournalHandler())
     log.setLevel(logging.INFO)
 
-    log.info(prediction)
-    print(prediction)
+    # prediction = "Anomaly" else "Normal"
+    if score > 2000:
+        log.info(f"prediction: {score} - Anomaly detected")
+    
 #    if model.predict([flow])[0] == -1:
 #       log = logging.getLogger('2columnS')
 #      log.addHandler(JournalHandler())
@@ -119,8 +121,6 @@ classifier.start()
 
 while True:
 
-    sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_USERSOCK)
-    sock.bind((0, NETLINK_MYGROUP))
 
     data = ''
     try:
@@ -140,9 +140,7 @@ while True:
     msg_data = data[16:msg_len].strip(b'\x00').decode()
 
     p = msg_data.split(',')
-
-    '''
-
+    
 
     p[2] = float(p[2])
     p[3] = float(p[3])
@@ -154,11 +152,9 @@ while True:
 
     window.append(p)
     
-    print(classifier.is_alive())
 
     if not classifier.is_alive():
         classifier = threading.Thread(target=classify, args=(window,), daemon=True) 
         classifier.start()
     
-    '''
 

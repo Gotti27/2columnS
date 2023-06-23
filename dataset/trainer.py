@@ -1,8 +1,8 @@
-from sklearn import svm
+from sklearn import linear_model
 import pandas
 import joblib
 
-model = svm.OneClassSVM(nu=0.01, kernel='rbf', gamma=0.1)
+model = linear_model.SGDOneClassSVM(nu=0.1,verbose=1 )
 
 train = list(pandas.read_csv('processed_dataset.csv').values) 
 
