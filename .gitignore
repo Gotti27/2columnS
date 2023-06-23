@@ -187,6 +187,5 @@ fabric.properties
 comm_test/netlink_user
 
 *.csv
-*.pkl
 
 build/
