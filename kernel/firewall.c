@@ -12,27 +12,50 @@
 #include <linux/timekeeping.h>
 
 #define NETLINK_GROUP 2
+// #define strLength(x) (sizeof(x) / sizeof((x)[0]))
 
 static struct nf_hook_ops hook_in;
 struct sock *nl_sk = NULL;
 static int pid = -1;
 static unsigned int seq = 0;
+static int LOCK = 0;
 
 static void set_netlink_pid(struct sk_buff *skb){
     struct nlmsghdr *nlh;
 
     nlh = (struct nlmsghdr *)skb->data;
     printk(KERN_INFO "Netlink received msg payload: %s\n", (char *)nlmsg_data(nlh));
+    
+    char *payload = (char *)nlmsg_data(nlh);
+
+    printk(KERN_INFO "%ld\n", strlen(payload)); 
+   
+    if (strncmp(payload, "RULE", 4) == 0) {
+	char *rule = payload + 5;
+	printk(KERN_INFO "oh look! a new rule %s\n", rule);
+	if (strncmp(rule, "LOCK", 4) == 0) {
+		LOCK = 1;
+		printk(KERN_INFO "IN chain locked!");
+	} else if (strncmp(rule, "UNLOCK", 6) == 0) {
+		LOCK = 0;
+		printk(KERN_INFO "IN chain unlocked!");
+	}
+    }
+
     pid = nlh->nlmsg_pid; /*pid of sending process */
 }
 
-unsigned int printInfo(void* priv, struct sk_buff* skb, const struct nf_hook_state *state){
+unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook_state *state){
     struct nlmsghdr *nlh;
     struct sk_buff *skb_out;
     struct iphdr *iph;
     struct tcphdr *tcph;
     struct ethhdr *ether;
     int msg_size, res, ip_len;
+
+    if (LOCK) {
+    	return NF_DROP;
+    }
 
     if (pid == -1) {
         printk(KERN_ERR "Pid or Buffer not configured\n");
@@ -82,7 +105,7 @@ int firewall_init(void){
     };
 
     printk(KERN_INFO "-- Registering Filters --\n");
-    hook_in.hook = printInfo;
+    hook_in.hook = firewall_main;
     hook_in.hooknum = NF_INET_LOCAL_IN;
     hook_in.pf = PF_INET;
     hook_in.priority = NF_IP_PRI_FIRST;

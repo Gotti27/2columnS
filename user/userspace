@@ -12,6 +12,9 @@ from systemd.journal import JournalHandler
 import pandas
 import joblib
 
+import json
+
+
 def mean(l):
     if len(l) == 0:
         return 0
@@ -83,6 +86,34 @@ msg = msg_len.to_bytes(4, 'little') + b"\x03\x00" + b"\x00"*2 + b"\x00"*4 + b"\x
 
 sock.send(msg)
 
+print("sending rules to kernel module")
+
+
+def send_msg_to_kernel(msg: str):
+    rule_data = f"RULE:{msg}".encode()
+    rule_len = 16 + len(rule_data)
+    rule_msg = rule_len.to_bytes(4, 'little') + b"\x03\x00" + b"\x00"*2 + b"\x00"*4 + b"\xb3\x15\x00\x00" + rule_data 
+
+    sock.send(rule_msg)
+
+with open('rules.json', "r") as rules_file:
+    rules = json.loads(rules_file.read())
+
+    if rules['lock'].lower() == 'true':
+        send_msg_to_kernel("LOCK")
+        print("--- IN networking locked ---")
+    elif rules['lock'].lower() == 'false':
+        send_msg_to_kernel("UNLOCK")
+        print("--- IN networking unlocked ---")
+    else:
+        raise Exception("lock policy not valid, use 'true' or 'false'")
+
+    for i in rules['rules']:
+        send_msg_to_kernel(i) 
+        print(f"rule {i} dispatched")
+   
+    default_policy = rules['default']
+    send_msg_to_kernel(f'DEFAULT-{default_policy}')
 
 print("Starting reciving.....")
 
