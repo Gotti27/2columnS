@@ -12,14 +12,16 @@
 #include <linux/timekeeping.h>
 
 #define NETLINK_GROUP 2
-// #define strLength(x) (sizeof(x) / sizeof((x)[0]))
+
+#define TC_DROP 1
+#define TC_ACCEPT 0
 
 static struct nf_hook_ops hook_in;
 struct sock *nl_sk = NULL;
 static int pid = -1;
 static unsigned int seq = 0;
-static int LOCK = 0;
-static int DEFAULT = 0;
+static int LOCK = TC_ACCEPT;
+static int DEFAULT = TC_ACCEPT;
 
 
 typedef struct rule_struct {
@@ -39,7 +41,6 @@ typedef struct rule_list_struct {
 static rule_list r_list = NULL;
 
 void clean_rule_list(void) {
-	//free the linked list
 	rule_list next; 
 	
 	while (r_list != NULL) {
@@ -108,7 +109,6 @@ static void set_netlink_pid(struct sk_buff *skb){
     nlh = (struct nlmsghdr *)skb->data;
     printk(KERN_INFO "Netlink received msg payload: %s\n", (char *)nlmsg_data(nlh));
     
-    print_list();
     payload = (char *)nlmsg_data(nlh);
 
     printk(KERN_INFO "%ld\n", strlen(payload)); 
@@ -121,39 +121,25 @@ static void set_netlink_pid(struct sk_buff *skb){
 	if (msg_rule[0] == '0') {
 		msg_rule++;	
 		if (strncmp(msg_rule, "LOCK", 4) == 0) {
-			LOCK = 1;
+			LOCK = TC_DROP;
 			printk(KERN_INFO "IN chain locked!");
 			clean_rule_list();
-			print_list();
 		} else if (strncmp(msg_rule, "UNLOCK", 6) == 0) {
-			LOCK = 0;
+			LOCK = TC_ACCEPT;
 			printk(KERN_INFO "IN chain unlocked!");
 			clean_rule_list();
-			print_list();
 		} else if (strncmp(msg_rule, "DEFAULT", 7) == 0) {
 			msg_rule += 8;
-			if (strncmp(msg_rule, "DROP", 7) == 0) {
-				DEFAULT = 1;
-			} else {
-				DEFAULT = 0;
-			}
+			DEFAULT = strncmp(msg_rule, "DROP", 7) == 0 ? TC_DROP : TC_ACCEPT;
 		}
 	} else {
 		msg_rule++;
 		r = (rule) msg_rule;
-
 		create_rule(r);
-
 		printk(KERN_INFO "rule: source %s\n\tdest: %s\n\tport: %hd\n\tproto: %x\n\taction: %x\n", r->source, r->destination, r->port, r->protocol, r->action);
-
 		print_list();
 	}
-
     }
-
-
-    print_list();
-
     pid = nlh->nlmsg_pid; /*pid of sending process */
 }
 
@@ -194,7 +180,7 @@ unsigned int match_rules(struct ethhdr *ether, struct iphdr *iph, struct tcphdr 
 		curr = curr->next;
 		index++;
 	}	
-	return 0; //don't drop
+	return TC_ACCEPT; //don't drop
 }
 
 
@@ -222,7 +208,7 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
 
     if (pid == -1) {
         printk(KERN_ERR "Pid or Buffer not configured\n");
-        return DEFAULT ? NF_DROP : NF_ACCEPT;
+        return DEFAULT == TC_DROP ? NF_DROP : NF_ACCEPT;
     }
 
     msg_size = 100;
@@ -231,7 +217,7 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
     skb_out = nlmsg_new(msg_size, GFP_KERNEL);
     if (!skb_out) {
         printk(KERN_ERR "Failed to allocate new skb\n");
-        return DEFAULT ? NF_DROP : NF_ACCEPT;
+        return DEFAULT == TC_DROP ? NF_DROP : NF_ACCEPT;
     }
 
     nlh = nlmsg_put(skb_out, 0, seq++, NLMSG_DONE, msg_size, 0);
@@ -255,7 +241,7 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
         pid = -1;
     }
 
-    return DEFAULT ? NF_DROP : NF_ACCEPT;
+    return DEFAULT == TC_DROP ? NF_DROP : NF_ACCEPT;
 }
 
 int firewall_init(void){
