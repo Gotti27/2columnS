@@ -28,7 +28,7 @@ typedef struct rule_struct {
 	char source[16];
 	char destination[16];
 	unsigned short port;
-	char protocol;
+	unsigned char protocol;
 	char action;
 } *rule;
 
@@ -161,7 +161,9 @@ unsigned int match_rules(struct ethhdr *ether, struct iphdr *iph, struct tcphdr 
 		source_match = strncmp(rule->source, "*", 1) == 0 || strncmp(rule->source, packet_source, 16) == 0;
 		dest_match = strncmp(rule->destination, "*", 1) == 0 || strncmp(rule->destination, packet_dest, 16) == 0;
 		port_match = rule->port == 0 || ntohs(tcph->dest) == rule->port;
-        proto_match = rule->protocol == 250 || (char)iph->protocol == rule->protocol;
+        	proto_match = rule->protocol == 250 || (char)iph->protocol == rule->protocol;
+
+		// printk(KERN_DEBUG "matching: source: %d, dest: %d, port: %d, proto: %d\n", source_match, dest_match, port_match, proto_match);
 
 		if (source_match && dest_match && port_match && proto_match ) {
 			printk(KERN_DEBUG "rule %d match\n", index);
