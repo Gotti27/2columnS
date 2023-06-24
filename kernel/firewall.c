@@ -27,7 +27,7 @@ static int DEFAULT = TC_ACCEPT;
 typedef struct rule_struct {
 	char source[16];
 	char destination[16];
-	short port;
+	unsigned short port;
 	char protocol;
 	char action;
 } *rule;
@@ -145,7 +145,7 @@ static void set_netlink_pid(struct sk_buff *skb){
 
 
 unsigned int match_rules(struct ethhdr *ether, struct iphdr *iph, struct tcphdr *tcph) {
-	int match, source_match, dest_match, port_match, proto_match;
+	int source_match, dest_match, port_match, proto_match;
 	char packet_source[16];
 	char packet_dest[16];
 	int index = 0;
@@ -157,14 +157,10 @@ unsigned int match_rules(struct ethhdr *ether, struct iphdr *iph, struct tcphdr 
 
 	while (curr != NULL) {
 		rule rule = curr->data;
-		match = 0;
 
 		source_match = strncmp(rule->source, "*", 1) == 0 || strncmp(rule->source, packet_source, 16) == 0;
-
 		dest_match = strncmp(rule->destination, "*", 1) == 0 || strncmp(rule->destination, packet_dest, 16) == 0;
-		
 		port_match = rule->port == 0 || ntohs(tcph->dest) == rule->port;
-
         proto_match = rule->protocol == 250 || (char)iph->protocol == rule->protocol;
 
 		if (source_match && dest_match && port_match && proto_match ) {
