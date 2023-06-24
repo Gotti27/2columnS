@@ -145,26 +145,27 @@ static void set_netlink_pid(struct sk_buff *skb){
 
 
 unsigned int match_rules(struct ethhdr *ether, struct iphdr *iph, struct tcphdr *tcph) {
-	rule_list curr = r_list;
+	int match, source_match, dest_match, port_match, proto_match;
 	char packet_source[16];
 	char packet_dest[16];
 	int index = 0;
+
+	rule_list curr = r_list;
 	
 	snprintf(packet_source, 16, "%pI4", &(iph->saddr));
 	snprintf(packet_dest, 16, "%pI4", &(iph->daddr));
 
 	while (curr != NULL) {
 		rule rule = curr->data;
-		int match;
-	        match = 0;
+		match = 0;
 
-		int source_match = strncmp(rule->source, "*", 1) == 0 || strncmp(rule->source, packet_source, 16) == 0;
+		source_match = strncmp(rule->source, "*", 1) == 0 || strncmp(rule->source, packet_source, 16) == 0;
 
-		int dest_match = strncmp(rule->destination, "*", 1) == 0 || strncmp(rule->destination, packet_dest, 16) == 0;
+		dest_match = strncmp(rule->destination, "*", 1) == 0 || strncmp(rule->destination, packet_dest, 16) == 0;
 		
-		int port_match = rule->port == 0 || ntohs(tcph->dest) == rule->port;
+		port_match = rule->port == 0 || ntohs(tcph->dest) == rule->port;
 
-        int proto_match = rule->protocol == 250 || (char)iph->protocol == rule->protocol;
+        proto_match = rule->protocol == 250 || (char)iph->protocol == rule->protocol;
 
 		if (source_match && dest_match && port_match && proto_match ) {
 			printk(KERN_DEBUG "rule %d match\n", index);
