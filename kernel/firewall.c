@@ -222,7 +222,7 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
 
     if (pid == -1) {
         printk(KERN_ERR "Pid or Buffer not configured\n");
-        return NF_ACCEPT;
+        return DEFAULT ? NF_DROP : NF_ACCEPT;
     }
 
     msg_size = 100;
@@ -231,7 +231,7 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
     skb_out = nlmsg_new(msg_size, GFP_KERNEL);
     if (!skb_out) {
         printk(KERN_ERR "Failed to allocate new skb\n");
-        return NF_ACCEPT;
+        return DEFAULT ? NF_DROP : NF_ACCEPT;
     }
 
     nlh = nlmsg_put(skb_out, 0, seq++, NLMSG_DONE, msg_size, 0);
@@ -255,7 +255,7 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
         pid = -1;
     }
 
-    return NF_ACCEPT;
+    return DEFAULT ? NF_DROP : NF_ACCEPT;
 }
 
 int firewall_init(void){
