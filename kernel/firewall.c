@@ -164,14 +164,7 @@ unsigned int match_rules(struct ethhdr *ether, struct iphdr *iph, struct tcphdr 
 		
 		int port_match = rule->port == 0 || ntohs(tcph->dest) == rule->port;
 
-		/*
-		char protocol[4];
-	       	snprintf(protocol, 4, "%02x", iph->protocol);
-		
-		printk(KERN_INFO "%s", protocol);
-
-		*/
-		int proto_match = rule->protocol == 420; // || (int)kstrtol(protocol, NULL, 16) == rule->protocol;	
+        int proto_match = rule->protocol == 250 || (char)iph->protocol == rule->protocol;
 
 		if (source_match && dest_match && port_match && proto_match ) {
 			printk(KERN_DEBUG "rule %d match\n", index);
