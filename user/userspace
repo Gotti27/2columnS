@@ -12,6 +12,9 @@ from systemd.journal import JournalHandler
 import pandas
 import joblib
 
+import json
+
+
 def mean(l):
     if len(l) == 0:
         return 0
@@ -62,6 +65,9 @@ def parse_window(window):
 
 
 
+log = logging.getLogger('2columnS')
+log.addHandler(JournalHandler())
+log.setLevel(logging.INFO)
 
 model = joblib.load('svm_model.pkl')
 
@@ -73,7 +79,7 @@ sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_USERSOCK
 
 sock.bind((0, NETLINK_MYGROUP))
 
-print("Sending msg")
+log.info("Sending msg")
 
 msg_data = b"Netlink connection established\x00"
 msg_len = 16 + len(msg_data)
@@ -83,8 +89,52 @@ msg = msg_len.to_bytes(4, 'little') + b"\x03\x00" + b"\x00"*2 + b"\x00"*4 + b"\x
 
 sock.send(msg)
 
+log.info("sending rules to kernel module")
 
-print("Starting reciving.....")
+
+def send_msg_to_kernel(msg, rule: bool):
+    rule_data = b''
+    if rule:
+        source = msg['source'].encode().ljust(16, b'\x00')  
+        #diff = 16 - len(source)
+        #source += b'\x00' * diff
+        destination = msg['destination'].encode().ljust(16, b'\x00')
+        #diff = 16 - len(destination)
+        #destination += b'\x00' * diff
+        port = msg['port'].to_bytes(2, 'little')
+        protocol = msg['protocol'].to_bytes(1, 'little')                                                    
+        action = msg['action'].to_bytes(1, 'little') 
+                                                                   
+        rule_data = b'RULE:1' + source + destination + port + protocol + action
+        log.info(rule_data)
+    else:
+        rule_data = f"RULE:0{msg}".encode()
+
+    rule_len = 16 + len(rule_data)
+    rule_msg = rule_len.to_bytes(4, 'little') + b"\x03\x00" + b"\x00"*2 + b"\x00"*4 + b"\xb3\x15\x00\x00" + rule_data 
+
+    sock.send(rule_msg)
+
+with open('rules.json', "r") as rules_file:
+    rules = json.loads(rules_file.read())
+
+    if rules['lock'].lower() == 'true':
+        send_msg_to_kernel("LOCK", False)
+        log.info("--- IN networking locked ---")
+    elif rules['lock'].lower() == 'false':
+        send_msg_to_kernel("UNLOCK", False)
+        log.info("--- IN networking unlocked ---")
+    else:
+        raise Exception("lock policy not valid, use 'true' or 'false'")
+
+    for i in rules['rules']:
+        send_msg_to_kernel(i, True) 
+        log.info(f"rule {i} dispatched")
+   
+    default_policy = rules['default']
+    send_msg_to_kernel(f'DEFAULT-{default_policy}', False)
+
+log.info("Starting reciving.....")
 
 window = []
 
@@ -101,10 +151,6 @@ def classify(window):
 
     score = model.score_samples([flow])
 
-    log = logging.getLogger('2columnS')
-    log.addHandler(JournalHandler())
-    log.setLevel(logging.INFO)
-
     # prediction = "Anomaly" else "Normal"
     if score > 2000:
         log.info(f"prediction: {score} - Anomaly detected")
@@ -120,8 +166,6 @@ classifier = threading.Thread(target=classify, args=(window,), daemon=True)
 classifier.start()
 
 while True:
-
-
     data = ''
     try:
         data = sock.recvmsg(1024)[0]
@@ -130,17 +174,14 @@ while True:
         log.addHandler(JournalHandler())
         log.setLevel(logging.INFO)
         log.info("Anomaly detected")
-        
         continue
 
-    
     msg_hdr = data[:16]
     
     msg_len, msg_type, flags, seq, pid = struct.unpack("=LHHLL", msg_hdr)
     msg_data = data[16:msg_len].strip(b'\x00').decode()
 
-    p = msg_data.split(',')
-    
+    p = msg_data.split(',')    
 
     p[2] = float(p[2])
     p[3] = float(p[3])
@@ -151,10 +192,8 @@ while True:
     p[10]= float(p[10])
 
     window.append(p)
-    
 
     if not classifier.is_alive():
         classifier = threading.Thread(target=classify, args=(window,), daemon=True) 
         classifier.start()
-    
 
