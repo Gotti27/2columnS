@@ -36,6 +36,23 @@ with open('/etc/systemd/system/2columnS.service', 'w') as f:
 
 os.system('sudo systemctl daemon-reload')
 
+with open(f'{os.getcwd()}/user/rules.json', 'w') as rules:
+    rules.write('''
+{
+	"lock": "false",
+	"rules": [
+		{
+			"source": "*",
+			"destination": "*",
+			"port": 22,
+			"protocol": 6,
+			"action": 1
+		}
+	],
+	"default": "ACCEPT"
+}
+    ''')
+
 print("\t User space daemon installed")
 
 print("--- installation complete ---")
