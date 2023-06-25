@@ -97,7 +97,7 @@ void print_list(void) {
 	printk(KERN_DEBUG " -- End printing rules\n");
 }
 
-static void set_netlink_pid(struct sk_buff *skb){
+static void netlink_handler(struct sk_buff *skb){
     struct nlmsghdr *nlh;
     char *payload; 
     char *msg_rule;
@@ -208,7 +208,6 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
     }
 
     nlh = nlmsg_put(skb_out, 0, seq++, NLMSG_DONE, msg_size, 0);
-    NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
     snprintf(nlmsg_data(nlh), msg_size, "%pI4,%pI4,%d,%d,%x:%x:%x:%x:%x:%x,%x:%x:%x:%x:%x:%x,%02x,%hu,%c,%c,%llu",
              &(iph->saddr), &(iph->daddr), // src/dest ip
              ntohs(tcph->source), ntohs(tcph->dest), // src/dest port
@@ -233,7 +232,7 @@ unsigned int firewall_main(void* priv, struct sk_buff* skb, const struct nf_hook
 
 int firewall_init(void){
     struct netlink_kernel_cfg cfg = {
-        .input = set_netlink_pid,
+        .input = netlink_handler,
     };
 
     printk(KERN_INFO "-- Registering Filters --\n");

@@ -40,25 +40,12 @@ def parse_window(window):
     d.append(len(window))
     d.append(len(connections))
     d.append(mean([len(list(filter(lambda c: c[0] == s, connections))) for s in sources]))
-    
-    # macs = list(set([(w[4], w[0]) for w in window]))
-    # print(macs)
-    # d.append( max(  same_mac.values() ) if len(macs.values()) > 0 else 0)
 
     establishing = list(set(map(lambda e: (e[0],e[2],e[1],e[3]), list(filter(lambda w: w[-3] == 1, window)))))
 
     d.append(len(establishing))
-    # d.append(len(connections) - len(establishing))
     d.append(mean(list(map(lambda w: w[-4], window))))
     
-    """
-    for c in connections:
-
-    for w in window:
-        c = (w[0],w[2],w[1],w[3])
-    
-    """
-
     d.append(mean(packets_per_conn.values()))
 
     return d
@@ -96,11 +83,7 @@ def send_msg_to_kernel(msg, rule: bool):
     rule_data = b''
     if rule:
         source = msg['source'].encode().ljust(16, b'\x00')  
-        #diff = 16 - len(source)
-        #source += b'\x00' * diff
         destination = msg['destination'].encode().ljust(16, b'\x00')
-        #diff = 16 - len(destination)
-        #destination += b'\x00' * diff
         port = msg['port'].to_bytes(2, 'little')
         protocol = msg['protocol'].to_bytes(1, 'little')                                                    
         action = msg['action'].to_bytes(1, 'little') 
@@ -151,15 +134,10 @@ def classify(window):
 
     score = model.score_samples([flow])
 
-    # prediction = "Anomaly" else "Normal"
     if score > 2000:
         log.info(f"prediction: {score} - Anomaly detected")
     
-#    if model.predict([flow])[0] == -1:
-#       log = logging.getLogger('2columnS')
-#      log.addHandler(JournalHandler())
-#     log.setLevel(logging.INFO)
-#    log.info("Anomaly Detected")
+
 
 
 classifier = threading.Thread(target=classify, args=(window,), daemon=True) 
